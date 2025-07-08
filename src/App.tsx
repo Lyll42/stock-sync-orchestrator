@@ -9,25 +9,28 @@ import Dashboard from "@/pages/Dashboard";
 import Products from "@/pages/Products";
 import Movements from "@/pages/Movements";
 import Integrations from "@/pages/Integrations";
+import { EventProvider } from "@/contexts/EventContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="products" element={<Products />} />
-            <Route path="movements" element={<Movements />} />
-            <Route path="integrations" element={<Integrations />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <EventProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="products" element={<Products />} />
+              <Route path="movements" element={<Movements />} />
+              <Route path="integrations" element={<Integrations />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </EventProvider>
   </QueryClientProvider>
 );
 
