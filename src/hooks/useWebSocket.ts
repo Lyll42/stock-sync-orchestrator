@@ -1,167 +1,118 @@
 
-import { useEffect, useRef, useState } from 'react';
-import { useEvents } from '@/contexts/EventContext';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface WebSocketConfig {
-  url: string;
-  protocols?: string | string[];
+export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+interface UseWebSocketOptions {
+  onMessage?: (data: any) => void;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onError?: (error: Event) => void;
   reconnectAttempts?: number;
   reconnectInterval?: number;
 }
 
-interface WebSocketHook {
-  isConnected: boolean;
-  connectionState: number;
-  sendMessage: (message: any) => void;
-  lastMessage: any;
-  error: Event | null;
-}
+export const useWebSocket = (url: string | null, options: UseWebSocketOptions = {}) => {
+  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
+  const [reconnectCount, setReconnectCount] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-export const useWebSocket = (config: WebSocketConfig): WebSocketHook => {
-  const { addEvent } = useEvents();
-  const ws = useRef<WebSocket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionState, setConnectionState] = useState(WebSocket.CLOSED);
-  const [lastMessage, setLastMessage] = useState<any>(null);
-  const [error, setError] = useState<Event | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = config.reconnectAttempts ?? 5;
-  const reconnectInterval = config.reconnectInterval ?? 3000;
+  const {
+    onMessage,
+    onConnect,
+    onDisconnect,
+    onError,
+    reconnectAttempts = 3,
+    reconnectInterval = 3000
+  } = options;
 
-  const connect = () => {
+  const connect = useCallback(() => {
+    if (!url || wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
     try {
-      ws.current = new WebSocket(config.url, config.protocols);
-      
-      ws.current.onopen = () => {
-        setIsConnected(true);
-        setConnectionState(WebSocket.OPEN);
-        setError(null);
-        reconnectAttempts.current = 0;
-        
-        addEvent({
-          type: 'integration_status',
-          title: 'WebSocket Conectado',
-          message: 'Conexión WebSocket establecida exitosamente',
-          severity: 'success',
-          source: 'websocket',
-        });
+      setStatus('connecting');
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setStatus('connected');
+        setReconnectCount(0);
+        onConnect?.();
       };
 
-      ws.current.onclose = (event) => {
-        setIsConnected(false);
-        setConnectionState(WebSocket.CLOSED);
-        
-        if (!event.wasClean && reconnectAttempts.current < maxReconnectAttempts) {
-          setTimeout(() => {
-            reconnectAttempts.current++;
-            addEvent({
-              type: 'integration_status',
-              title: 'Reintentando Conexión',
-              message: `Intento ${reconnectAttempts.current} de ${maxReconnectAttempts}`,
-              severity: 'warning',
-              source: 'websocket',
-            });
-            connect();
-          }, reconnectInterval);
-        } else if (reconnectAttempts.current >= maxReconnectAttempts) {
-          addEvent({
-            type: 'integration_status',
-            title: 'Conexión Fallida',
-            message: 'No se pudo establecer conexión después de múltiples intentos',
-            severity: 'error',
-            source: 'websocket',
-          });
-        }
-      };
-
-      ws.current.onerror = (event) => {
-        setError(event);
-        addEvent({
-          type: 'integration_status',
-          title: 'Error de WebSocket',
-          message: 'Error en la conexión WebSocket',
-          severity: 'error',
-          source: 'websocket',
-        });
-      };
-
-      ws.current.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setLastMessage(data);
-          
-          // Process different types of messages from N8N
-          if (data.type === 'stock_update') {
-            addEvent({
-              type: 'n8n_sync',
-              title: 'Stock Actualizado',
-              message: `Stock actualizado para ${data.product_name}`,
-              severity: 'info',
-              source: 'n8n',
-              data: data,
-            });
-          } else if (data.type === 'low_stock_alert') {
-            addEvent({
-              type: 'stock_alert',
-              title: 'Alerta de Stock Bajo',
-              message: `${data.product_name} tiene stock crítico (${data.current_stock} unidades)`,
-              severity: 'warning',
-              source: 'n8n',
-              data: data,
-            });
-          } else if (data.type === 'order_processed') {
-            addEvent({
-              type: 'webhook_received',
-              title: 'Orden Procesada',
-              message: `Nueva orden #${data.order_id} procesada`,
-              severity: 'success',
-              source: 'n8n',
-              data: data,
-            });
-          }
-        } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
+          onMessage?.(data);
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
         }
       };
 
-      setConnectionState(WebSocket.CONNECTING);
-    } catch (err) {
-      console.error('Error creating WebSocket connection:', err);
-      setError(err as Event);
-    }
-  };
+      ws.onclose = () => {
+        setStatus('disconnected');
+        onDisconnect?.();
+        
+        // Auto-reconnect logic
+        if (reconnectCount < reconnectAttempts) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            setReconnectCount(prev => prev + 1);
+            connect();
+          }, reconnectInterval);
+        }
+      };
 
-  const sendMessage = (message: any) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(message));
-    } else {
-      addEvent({
-        type: 'integration_status',
-        title: 'Error de Envío',
-        message: 'No se puede enviar mensaje: WebSocket no conectado',
-        severity: 'error',
-        source: 'websocket',
-      });
+      ws.onerror = (error) => {
+        setStatus('error');
+        onError?.(error);
+      };
+
+    } catch (error) {
+      setStatus('error');
+      console.error('WebSocket connection failed:', error);
     }
-  };
+  }, [url, onMessage, onConnect, onDisconnect, onError, reconnectCount, reconnectAttempts, reconnectInterval]);
+
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    
+    setStatus('disconnected');
+    setReconnectCount(0);
+  }, []);
+
+  const sendMessage = useCallback((message: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
+  }, []);
 
   useEffect(() => {
-    if (config.url) {
+    if (url) {
       connect();
     }
 
     return () => {
-      if (ws.current) {
-        ws.current.close();
-      }
+      disconnect();
     };
-  }, [config.url]);
+  }, [url, connect, disconnect]);
 
   return {
-    isConnected,
-    connectionState,
+    status,
+    connect,
+    disconnect,
     sendMessage,
-    lastMessage,
-    error,
+    reconnectCount,
+    isConnected: status === 'connected'
   };
 };

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,14 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { useEvents } from "@/contexts/EventContext";
 import { Plus, Filter, Calendar as CalendarIcon, ArrowUp, ArrowDown, RefreshCw, Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+
+interface Product {
+  sku: string;
+  name: string;
+  currentStock: number;
+  minStock: number;
+}
 
 interface Movement {
   id: string;
@@ -34,6 +41,7 @@ interface Movement {
 
 const Movements = () => {
   const { toast } = useToast();
+  const { addEvent } = useEvents();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -51,14 +59,14 @@ const Movements = () => {
     date: new Date()
   });
 
-  // Productos disponibles (simulado)
-  const availableProducts = [
-    { sku: "LAP001", name: "Laptop Dell XPS 13", currentStock: 25 },
-    { sku: "MOU001", name: "Mouse Logitech MX Master", currentStock: 3 },
-    { sku: "TEC001", name: "Teclado Mecánico RGB", currentStock: 15 },
-    { sku: "MON001", name: "Monitor 4K 27 pulgadas", currentStock: 8 },
-    { sku: "AUR001", name: "Auriculares Sony WH-1000XM4", currentStock: 12 }
-  ];
+  // Productos disponibles (simulado) - En producción esto vendría de una API
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([
+    { sku: "LAP001", name: "Laptop Dell XPS 13", currentStock: 25, minStock: 5 },
+    { sku: "MOU001", name: "Mouse Logitech MX Master", currentStock: 3, minStock: 10 },
+    { sku: "TEC001", name: "Teclado Mecánico RGB", currentStock: 15, minStock: 8 },
+    { sku: "MON001", name: "Monitor 4K 27 pulgadas", currentStock: 8, minStock: 3 },
+    { sku: "AUR001", name: "Auriculares Sony WH-1000XM4", currentStock: 12, minStock: 5 }
+  ]);
 
   // Movimientos de ejemplo
   const movements: Movement[] = [
@@ -134,6 +142,29 @@ const Movements = () => {
     { value: "ADJUSTMENT", label: "Ajuste", icon: RefreshCw, color: "text-blue-600" }
   ];
 
+  const calculateNewStock = (currentStock: number, quantity: number, type: string): number => {
+    switch (type) {
+      case "IN":
+        return currentStock + Math.abs(quantity);
+      case "OUT":
+        return currentStock - Math.abs(quantity);
+      case "ADJUSTMENT":
+        return currentStock + quantity; // Permite números negativos para ajustes
+      default:
+        return currentStock;
+    }
+  };
+
+  const updateProductStock = (sku: string, newStock: number) => {
+    setAvailableProducts(prev => 
+      prev.map(product => 
+        product.sku === sku 
+          ? { ...product, currentStock: newStock }
+          : product
+      )
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -146,12 +177,94 @@ const Movements = () => {
       return;
     }
 
-    // Simular guardado
-    console.log("Guardando movimiento:", formData);
+    const selectedProduct = availableProducts.find(p => p.sku === formData.productSku);
+    if (!selectedProduct) {
+      toast({
+        title: "Error",
+        description: "Producto no encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calcular el nuevo stock basado en el tipo de movimiento
+    const adjustedQuantity = formData.type === "OUT" ? Math.abs(formData.quantity) : formData.quantity;
+    const newStock = calculateNewStock(selectedProduct.currentStock, adjustedQuantity, formData.type);
+
+    // Validar que no haya stock negativo para salidas
+    if (newStock < 0 && formData.type === "OUT") {
+      toast({
+        title: "Error",
+        description: `Stock insuficiente. Stock actual: ${selectedProduct.currentStock}, cantidad solicitada: ${Math.abs(formData.quantity)}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Actualizar el stock del producto
+    updateProductStock(formData.productSku, newStock);
+
+    // Determinar la cantidad real del movimiento (con signo correcto)
+    let movementQuantity: number;
+    switch (formData.type) {
+      case "IN":
+        movementQuantity = Math.abs(formData.quantity);
+        break;
+      case "OUT":
+        movementQuantity = -Math.abs(formData.quantity);
+        break;
+      case "ADJUSTMENT":
+        movementQuantity = formData.quantity;
+        break;
+      default:
+        movementQuantity = formData.quantity;
+    }
+
+    // Simular guardado del movimiento
+    console.log("Guardando movimiento:", {
+      ...formData,
+      quantity: movementQuantity,
+      newStock,
+      productName: selectedProduct.name
+    });
+
+    // Agregar evento al sistema de notificaciones
+    addEvent({
+      type: 'movement_registered',
+      title: 'Movimiento Registrado',
+      message: `${formData.type === "IN" ? "Entrada" : formData.type === "OUT" ? "Salida" : "Ajuste"} de ${Math.abs(movementQuantity)} unidades de ${selectedProduct.name}`,
+      severity: 'success',
+      source: 'inventory',
+      data: {
+        productSku: formData.productSku,
+        productName: selectedProduct.name,
+        type: formData.type,
+        quantity: movementQuantity,
+        newStock,
+        reference: formData.reference
+      }
+    });
+
+    // Verificar si el stock está bajo después del movimiento
+    if (newStock <= selectedProduct.minStock && formData.type === "OUT") {
+      addEvent({
+        type: 'stock_alert',
+        title: 'Alerta de Stock Bajo',
+        message: `${selectedProduct.name} tiene stock bajo (${newStock} unidades). Mínimo requerido: ${selectedProduct.minStock}`,
+        severity: 'warning',
+        source: 'inventory',
+        data: {
+          productSku: formData.productSku,
+          productName: selectedProduct.name,
+          currentStock: newStock,
+          minStock: selectedProduct.minStock
+        }
+      });
+    }
     
     toast({
       title: "Éxito",
-      description: "Movimiento registrado correctamente. El stock se ha actualizado.",
+      description: `Movimiento registrado correctamente. Stock actualizado: ${newStock} unidades.`,
     });
 
     // Resetear formulario
@@ -206,6 +319,8 @@ const Movements = () => {
   });
 
   const selectedProduct = availableProducts.find(p => p.sku === formData.productSku);
+  const previewNewStock = selectedProduct && formData.quantity !== 0 ? 
+    calculateNewStock(selectedProduct.currentStock, formData.quantity, formData.type) : null;
 
   return (
     <div className="space-y-6">
@@ -317,55 +432,6 @@ const Movements = () => {
         </CardContent>
       </Card>
 
-      {/* Historial de Movimientos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de Movimientos</CardTitle>
-          <CardDescription>
-            {filteredMovements.length} movimientos encontrados
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Cantidad</TableHead>
-                <TableHead>Nuevo Stock</TableHead>
-                <TableHead>Referencia</TableHead>
-                <TableHead>Responsable</TableHead>
-                <TableHead>Valor</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMovements.map((movement) => (
-                <TableRow key={movement.id}>
-                  <TableCell>
-                    {format(movement.date, "dd/MM/yyyy", { locale: es })}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{movement.productName}</div>
-                      <div className="text-sm text-muted-foreground">{movement.productSku}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getMovementBadge(movement.type)}</TableCell>
-                  <TableCell>{getQuantityDisplay(movement)}</TableCell>
-                  <TableCell className="font-medium">{movement.newStock}</TableCell>
-                  <TableCell className="font-mono text-sm">{movement.reference}</TableCell>
-                  <TableCell>{movement.responsible}</TableCell>
-                  <TableCell>
-                    {movement.totalCost ? `$${movement.totalCost.toLocaleString()}` : "-"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
       {/* Formulario de Nuevo Movimiento */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl">
@@ -396,9 +462,16 @@ const Movements = () => {
                   </SelectContent>
                 </Select>
                 {selectedProduct && (
-                  <p className="text-sm text-muted-foreground">
-                    Stock actual: {selectedProduct.currentStock} unidades
-                  </p>
+                  <div className="text-sm space-y-1">
+                    <p className="text-muted-foreground">
+                      Stock actual: <span className="font-medium">{selectedProduct.currentStock}</span> unidades
+                    </p>
+                    {selectedProduct.currentStock <= selectedProduct.minStock && (
+                      <p className="text-orange-600 font-medium">
+                        ⚠️ Stock bajo (mínimo: {selectedProduct.minStock})
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -432,6 +505,7 @@ const Movements = () => {
                 <Input
                   id="quantity"
                   type="number"
+                  min="1"
                   value={formData.quantity || ""}
                   onChange={(e) => setFormData(prev => ({ 
                     ...prev, 
@@ -439,12 +513,43 @@ const Movements = () => {
                   }))}
                   placeholder="Ingresa la cantidad"
                 />
-                <p className="text-xs text-muted-foreground">
-                  {formData.type === "OUT" ? "Cantidad a restar (usar número positivo)" : 
-                   formData.type === "IN" ? "Cantidad a agregar" : 
-                   "Cantidad de ajuste (positivo o negativo)"}
-                </p>
+                <div className="text-xs space-y-1">
+                  {formData.type === "OUT" && (
+                    <p className="text-red-600">
+                      Se restará {Math.abs(formData.quantity)} del stock actual
+                    </p>
+                  )}
+                  {formData.type === "IN" && (
+                    <p className="text-green-600">
+                      Se agregará {Math.abs(formData.quantity)} al stock actual
+                    </p>
+                  )}
+                  {formData.type === "ADJUSTMENT" && (
+                    <p className="text-blue-600">
+                      Ajuste: {formData.quantity > 0 ? "+" : ""}{formData.quantity} unidades
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Preview del nuevo stock */}
+              {previewNewStock !== null && selectedProduct && (
+                <div className="space-y-2">
+                  <Label>Nuevo Stock (Preview)</Label>
+                  <div className={cn(
+                    "p-3 rounded-md border text-center font-medium",
+                    previewNewStock < 0 ? "bg-red-50 border-red-200 text-red-800" :
+                    previewNewStock <= selectedProduct.minStock ? "bg-orange-50 border-orange-200 text-orange-800" :
+                    "bg-green-50 border-green-200 text-green-800"
+                  )}>
+                    {previewNewStock} unidades
+                    {previewNewStock < 0 && <div className="text-xs">❌ Stock insuficiente</div>}
+                    {previewNewStock <= selectedProduct.minStock && previewNewStock >= 0 && (
+                      <div className="text-xs">⚠️ Stock bajo</div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="unitCost">Costo Unitario</Label>
@@ -522,13 +627,65 @@ const Movements = () => {
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit">
+              <Button 
+                type="submit"
+                disabled={previewNewStock !== null && previewNewStock < 0}
+              >
                 Registrar Movimiento
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Historial de Movimientos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historial de Movimientos</CardTitle>
+          <CardDescription>
+            {filteredMovements.length} movimientos encontrados
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Producto</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Cantidad</TableHead>
+                <TableHead>Nuevo Stock</TableHead>
+                <TableHead>Referencia</TableHead>
+                <TableHead>Responsable</TableHead>
+                <TableHead>Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMovements.map((movement) => (
+                <TableRow key={movement.id}>
+                  <TableCell>
+                    {format(movement.date, "dd/MM/yyyy", { locale: es })}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{movement.productName}</div>
+                      <div className="text-sm text-muted-foreground">{movement.productSku}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{getMovementBadge(movement.type)}</TableCell>
+                  <TableCell>{getQuantityDisplay(movement)}</TableCell>
+                  <TableCell className="font-medium">{movement.newStock}</TableCell>
+                  <TableCell className="font-mono text-sm">{movement.reference}</TableCell>
+                  <TableCell>{movement.responsible}</TableCell>
+                  <TableCell>
+                    {movement.totalCost ? `$${movement.totalCost.toLocaleString()}` : "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };
