@@ -1,10 +1,12 @@
 
-import { useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   BarChart3, 
   Package, 
@@ -14,12 +16,34 @@ import {
   Bell, 
   Settings, 
   User,
-  ChevronDown
+  ChevronDown,
+  Users,
+  LogOut
 } from "lucide-react";
 
 const AppLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, userRole, isAdmin, loading, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const navigation = [
     {
@@ -45,7 +69,13 @@ const AppLayout = () => {
       href: "/integrations",
       icon: Zap,
       description: "N8N y APIs"
-    }
+    },
+    ...(isAdmin ? [{
+      name: "Usuarios",
+      href: "/users",
+      icon: Users,
+      description: "Gestión de usuarios"
+    }] : [])
   ];
 
   const isActive = (path: string) => {
@@ -102,16 +132,31 @@ const AppLayout = () => {
 
       {/* User section */}
       <div className="px-4 py-4 border-t">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted cursor-pointer">
-          <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-            <User className="h-4 w-4" />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium">Juan Pérez</div>
-            <div className="text-xs text-muted-foreground">Administrador</div>
-          </div>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted cursor-pointer">
+              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                <User className="h-4 w-4" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium">{user.user_metadata?.full_name || user.email}</div>
+                <div className="text-xs text-muted-foreground">{userRole || "Usuario"}</div>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem>
+              <Settings className="mr-2 h-4 w-4" />
+              Configuración
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={signOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Cerrar Sesión
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -166,13 +211,28 @@ const AppLayout = () => {
             <Button variant="ghost" size="sm">
               <Settings className="h-5 w-5" />
             </Button>
-            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-muted cursor-pointer">
-              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                <User className="h-3 w-3 text-primary-foreground" />
-              </div>
-              <span className="text-sm font-medium">Juan Pérez</span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-muted cursor-pointer">
+                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                    <User className="h-3 w-3 text-primary-foreground" />
+                  </div>
+                  <span className="text-sm font-medium">{user.user_metadata?.full_name || user.email}</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configuración
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
