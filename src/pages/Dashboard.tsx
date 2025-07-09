@@ -136,14 +136,14 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header with Real-time Status */}
-      <div className="flex justify-between items-start">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-2">
             Panel de control con métricas en tiempo real
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="lg:flex-shrink-0 lg:w-96">
           <RealTimeNotifications />
         </div>
       </div>

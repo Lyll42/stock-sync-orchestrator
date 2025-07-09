@@ -63,7 +63,7 @@ const RealTimeNotifications: React.FC = () => {
   ).length;
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-base">
           <div className="flex items-center gap-2">
