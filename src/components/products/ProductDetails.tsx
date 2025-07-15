@@ -4,22 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Edit, MapPin, Package, DollarSign, TrendingUp, Calendar } from "lucide-react";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  currentStock: number;
-  minStock: number;
-  maxStock: number;
-  purchasePrice: number;
-  sellingPrice: number;
-  supplier: string;
-  location: string;
-  isActive: boolean;
-  lastMovement: string;
-}
+type Product = Tables<"products"> & {
+  categories?: {
+    name: string;
+  };
+};
 
 interface ProductDetailsProps {
   product: Product;
@@ -28,16 +19,14 @@ interface ProductDetailsProps {
 
 export const ProductDetails = ({ product, onEdit }: ProductDetailsProps) => {
   const getStockStatus = () => {
-    if (product.currentStock === 0) {
+    if (product.current_stock === 0) {
       return <Badge variant="destructive">Sin Stock</Badge>;
-    } else if (product.currentStock <= product.minStock) {
+    } else if (product.current_stock <= product.min_stock) {
       return <Badge variant="secondary" className="bg-orange-100 text-orange-800">Stock Bajo</Badge>;
     } else {
       return <Badge variant="default" className="bg-green-100 text-green-800">Stock Normal</Badge>;
     }
   };
-
-  const profitMargin = ((product.sellingPrice - product.purchasePrice) / product.purchasePrice * 100).toFixed(1);
 
   return (
     <div className="space-y-6">
@@ -64,35 +53,35 @@ export const ProductDetails = ({ product, onEdit }: ProductDetailsProps) => {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{product.currentStock}</div>
+            <div className="text-2xl font-bold">{product.current_stock}</div>
             <p className="text-xs text-muted-foreground">
-              Mín: {product.minStock} | Máx: {product.maxStock}
+              Mín: {product.min_stock} | Máx: {product.max_stock || "N/A"}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Precio de Venta</CardTitle>
+            <CardTitle className="text-sm font-medium">Precio Unitario</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${product.sellingPrice.toLocaleString()}</div>
+            <div className="text-2xl font-bold">${product.unit_price?.toLocaleString() || "0"}</div>
             <p className="text-xs text-muted-foreground">
-              Compra: ${product.purchasePrice.toLocaleString()}
+              Precio por unidad
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Margen de Ganancia</CardTitle>
+            <CardTitle className="text-sm font-medium">Valor Total Stock</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profitMargin}%</div>
+            <div className="text-2xl font-bold">${((product.unit_price || 0) * product.current_stock).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              ${(product.sellingPrice - product.purchasePrice).toLocaleString()} por unidad
+              {product.current_stock} unidades × ${product.unit_price || 0}
             </p>
           </CardContent>
         </Card>
@@ -107,58 +96,40 @@ export const ProductDetails = ({ product, onEdit }: ProductDetailsProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="font-medium text-sm text-muted-foreground">Categoría</h4>
-              <p className="font-medium">{product.category}</p>
+              <p className="font-medium">{product.categories?.name || "Sin categoría"}</p>
             </div>
             <div>
               <h4 className="font-medium text-sm text-muted-foreground">Proveedor</h4>
-              <p className="font-medium">{product.supplier}</p>
+              <p className="font-medium">{product.supplier || "N/A"}</p>
             </div>
             <div>
               <h4 className="font-medium text-sm text-muted-foreground">Ubicación</h4>
               <div className="flex items-center gap-1">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
-                <p className="font-medium">{product.location}</p>
+                <p className="font-medium">{product.location || "N/A"}</p>
               </div>
             </div>
             <div>
               <h4 className="font-medium text-sm text-muted-foreground">Estado</h4>
-              <Badge variant={product.isActive ? "default" : "secondary"}>
-                {product.isActive ? "Activo" : "Inactivo"}
+              <Badge variant={product.status === "active" ? "default" : "secondary"}>
+                {product.status === "active" ? "Activo" : "Inactivo"}
               </Badge>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Valor de Inventario */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Valor de Inventario</CardTitle>
-          <CardDescription>Cálculos basados en stock actual</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Valor de Compra Total</p>
-              <p className="text-2xl font-bold text-blue-600">
-                ${(product.currentStock * product.purchasePrice).toLocaleString()}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Valor de Venta Total</p>
-              <p className="text-2xl font-bold text-green-600">
-                ${(product.currentStock * product.sellingPrice).toLocaleString()}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Ganancia Potencial</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                ${(product.currentStock * (product.sellingPrice - product.purchasePrice)).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Descripción del Producto */}
+      {product.description && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Descripción</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">{product.description}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Actividad Reciente */}
       <Card>
@@ -201,7 +172,7 @@ export const ProductDetails = ({ product, onEdit }: ProductDetailsProps) => {
                 <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                 <div>
                   <p className="font-medium">Ajuste de precio</p>
-                  <p className="text-sm text-muted-foreground">Precio actualizado a ${product.sellingPrice}</p>
+                  <p className="text-sm text-muted-foreground">Precio actualizado a ${product.unit_price || 0}</p>
                 </div>
               </div>
               <div className="text-right">

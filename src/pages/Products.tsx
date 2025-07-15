@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,123 +10,87 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Plus, Edit, Eye, Trash2, Download, AlertTriangle } from "lucide-react";
 import { ProductForm } from "@/components/products/ProductForm";
 import { ProductDetails } from "@/components/products/ProductDetails";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
 
-// Tipos para los productos
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  currentStock: number;
-  minStock: number;
-  maxStock: number;
-  purchasePrice: number;
-  sellingPrice: number;
-  supplier: string;
-  location: string;
-  isActive: boolean;
-  lastMovement: string;
-}
+// Tipos para los productos basados en Supabase
+type Product = Tables<"products"> & {
+  category_name?: string;
+};
 
 const Products = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [stockFilter, setStockFilter] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Tables<"categories">[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Datos de ejemplo
-  const products: Product[] = [
-    {
-      id: "1",
-      name: "Laptop Dell XPS 13",
-      sku: "LAP001",
-      category: "Electrónicos",
-      currentStock: 25,
-      minStock: 5,
-      maxStock: 100,
-      purchasePrice: 800,
-      sellingPrice: 1200,
-      supplier: "Dell Technologies",
-      location: "A-1-01",
-      isActive: true,
-      lastMovement: "2024-01-15"
-    },
-    {
-      id: "2",
-      name: "Mouse Logitech MX Master",
-      sku: "MOU001",
-      category: "Accesorios",
-      currentStock: 3,
-      minStock: 10,
-      maxStock: 50,
-      purchasePrice: 45,
-      sellingPrice: 75,
-      supplier: "Logitech",
-      location: "B-2-05",
-      isActive: true,
-      lastMovement: "2024-01-14"
-    },
-    {
-      id: "3",
-      name: "Teclado Mecánico RGB",
-      sku: "TEC001",
-      category: "Accesorios",
-      currentStock: 15,
-      minStock: 8,
-      maxStock: 30,
-      purchasePrice: 65,
-      sellingPrice: 120,
-      supplier: "Corsair",
-      location: "B-1-03",
-      isActive: true,
-      lastMovement: "2024-01-13"
-    },
-    {
-      id: "4",
-      name: "Monitor 4K 27 pulgadas",
-      sku: "MON001",
-      category: "Electrónicos",
-      currentStock: 8,
-      minStock: 3,
-      maxStock: 20,
-      purchasePrice: 300,
-      sellingPrice: 450,
-      supplier: "Samsung",
-      location: "A-3-02",
-      isActive: true,
-      lastMovement: "2024-01-12"
-    },
-    {
-      id: "5",
-      name: "Auriculares Sony WH-1000XM4",
-      sku: "AUR001",
-      category: "Accesorios",
-      currentStock: 12,
-      minStock: 5,
-      maxStock: 25,
-      purchasePrice: 200,
-      sellingPrice: 350,
-      supplier: "Sony",
-      location: "C-1-04",
-      isActive: true,
-      lastMovement: "2024-01-11"
-    }
-  ];
-
-  const categories = ["Todos", "Electrónicos", "Accesorios", "Oficina", "Otros"];
   const stockOptions = ["Todos", "Stock Normal", "Stock Bajo", "Sin Stock"];
+
+  // Cargar productos y categorías desde Supabase
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Cargar categorías
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("categories")
+        .select("*")
+        .order("name");
+
+      if (categoriesError) {
+        throw categoriesError;
+      }
+
+      // Cargar productos con información de categoría
+      const { data: productsData, error: productsError } = await supabase
+        .from("products")
+        .select(`
+          *,
+          categories (
+            name
+          )
+        `)
+        .order("name");
+
+      if (productsError) {
+        throw productsError;
+      }
+
+      setCategories(categoriesData || []);
+      setProducts(productsData || []);
+    } catch (error) {
+      console.error("Error cargando datos:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtrar productos
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !categoryFilter || categoryFilter === "Todos" || product.category === categoryFilter;
+    const categoryName = (product as any).categories?.name || "";
+    const matchesCategory = !categoryFilter || categoryFilter === "Todos" || categoryName === categoryFilter;
     const matchesStock = !stockFilter || stockFilter === "Todos" ||
-                        (stockFilter === "Stock Bajo" && product.currentStock <= product.minStock) ||
-                        (stockFilter === "Sin Stock" && product.currentStock === 0) ||
-                        (stockFilter === "Stock Normal" && product.currentStock > product.minStock);
+                        (stockFilter === "Stock Bajo" && product.current_stock <= product.min_stock) ||
+                        (stockFilter === "Sin Stock" && product.current_stock === 0) ||
+                        (stockFilter === "Stock Normal" && product.current_stock > product.min_stock);
     
     return matchesSearch && matchesCategory && matchesStock;
   });
@@ -146,10 +110,46 @@ const Products = () => {
     setIsFormOpen(true);
   };
 
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar este producto?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Éxito",
+        description: "Producto eliminado correctamente.",
+      });
+
+      loadData(); // Recargar datos
+    } catch (error) {
+      console.error("Error eliminando producto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el producto.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    loadData(); // Recargar datos cuando se cierre el formulario
+  };
+
   const getStockStatus = (product: Product) => {
-    if (product.currentStock === 0) {
+    if (product.current_stock === 0) {
       return <Badge variant="destructive">Sin Stock</Badge>;
-    } else if (product.currentStock <= product.minStock) {
+    } else if (product.current_stock <= product.min_stock) {
       return <Badge variant="secondary" className="bg-orange-100 text-orange-800">Stock Bajo</Badge>;
     } else {
       return <Badge variant="default" className="bg-green-100 text-green-800">Normal</Badge>;
@@ -201,9 +201,10 @@ const Products = () => {
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="Todos">Todos</SelectItem>
                 {categories.map(category => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -233,66 +234,76 @@ const Products = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Precio Venta</TableHead>
-                <TableHead>Ubicación</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.sku}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {product.currentStock <= product.minStock && (
-                        <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      )}
-                      {product.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium">{product.currentStock}</div>
-                      <div className="text-muted-foreground">Min: {product.minStock}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStockStatus(product)}</TableCell>
-                  <TableCell>${product.sellingPrice.toLocaleString()}</TableCell>
-                  <TableCell>{product.location}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewProduct(product)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditProduct(product)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-muted-foreground">Cargando productos...</div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Precio Venta</TableHead>
+                  <TableHead>Ubicación</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.sku}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {product.current_stock <= product.min_stock && (
+                          <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        )}
+                        {product.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{(product as any).categories?.name || "Sin categoría"}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{product.current_stock}</div>
+                        <div className="text-muted-foreground">Min: {product.min_stock}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStockStatus(product)}</TableCell>
+                    <TableCell>${product.unit_price?.toLocaleString() || "0"}</TableCell>
+                    <TableCell>{product.location || "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewProduct(product)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditProduct(product)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDeleteProduct(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -312,7 +323,8 @@ const Products = () => {
           </DialogHeader>
           <ProductForm 
             product={selectedProduct} 
-            onClose={() => setIsFormOpen(false)} 
+            onClose={handleFormClose}
+            categories={categories}
           />
         </DialogContent>
       </Dialog>

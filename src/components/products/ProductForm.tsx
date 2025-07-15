@@ -7,46 +7,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  currentStock: number;
-  minStock: number;
-  maxStock: number;
-  purchasePrice: number;
-  sellingPrice: number;
-  supplier: string;
-  location: string;
-  isActive: boolean;
-  lastMovement: string;
-}
+type Product = Tables<"products">;
 
 interface ProductFormProps {
   product?: Product | null;
   onClose: () => void;
+  categories: Tables<"categories">[];
 }
 
-export const ProductForm = ({ product, onClose }: ProductFormProps) => {
+export const ProductForm = ({ product, onClose, categories }: ProductFormProps) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
     description: "",
-    category: "",
-    purchasePrice: 0,
-    sellingPrice: 0,
-    currentStock: 0,
-    minStock: 0,
-    maxStock: 0,
+    category_id: "",
+    unit_price: 0,
+    current_stock: 0,
+    min_stock: 0,
+    max_stock: 0,
     supplier: "",
     location: "",
-    isActive: true
+    status: "active"
   });
 
-  const categories = ["Electrónicos", "Accesorios", "Oficina", "Otros"];
   const suppliers = ["Dell Technologies", "Logitech", "Corsair", "Samsung", "Sony", "HP Inc.", "Apple"];
 
   useEffect(() => {
@@ -54,25 +41,24 @@ export const ProductForm = ({ product, onClose }: ProductFormProps) => {
       setFormData({
         name: product.name,
         sku: product.sku,
-        description: "",
-        category: product.category,
-        purchasePrice: product.purchasePrice,
-        sellingPrice: product.sellingPrice,
-        currentStock: product.currentStock,
-        minStock: product.minStock,
-        maxStock: product.maxStock,
-        supplier: product.supplier,
-        location: product.location,
-        isActive: product.isActive
+        description: product.description || "",
+        category_id: product.category_id || "",
+        unit_price: product.unit_price || 0,
+        current_stock: product.current_stock,
+        min_stock: product.min_stock,
+        max_stock: product.max_stock || 0,
+        supplier: product.supplier || "",
+        location: product.location || "",
+        status: product.status || "active"
       });
     }
   }, [product]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validaciones básicas
-    if (!formData.name || !formData.sku || !formData.category) {
+    if (!formData.name || !formData.sku || !formData.category_id) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios.",
@@ -81,24 +67,62 @@ export const ProductForm = ({ product, onClose }: ProductFormProps) => {
       return;
     }
 
-    if (formData.sellingPrice <= formData.purchasePrice) {
+    try {
+      if (product) {
+        // Actualizar producto existente
+        const { error } = await supabase
+          .from("products")
+          .update({
+            name: formData.name,
+            sku: formData.sku,
+            description: formData.description,
+            category_id: formData.category_id,
+            unit_price: formData.unit_price,
+            current_stock: formData.current_stock,
+            min_stock: formData.min_stock,
+            max_stock: formData.max_stock,
+            supplier: formData.supplier,
+            location: formData.location,
+            status: formData.status
+          })
+          .eq("id", product.id);
+
+        if (error) throw error;
+      } else {
+        // Crear nuevo producto
+        const { error } = await supabase
+          .from("products")
+          .insert({
+            name: formData.name,
+            sku: formData.sku,
+            description: formData.description,
+            category_id: formData.category_id,
+            unit_price: formData.unit_price,
+            current_stock: formData.current_stock,
+            min_stock: formData.min_stock,
+            max_stock: formData.max_stock,
+            supplier: formData.supplier,
+            location: formData.location,
+            status: formData.status
+          });
+
+        if (error) throw error;
+      }
+
       toast({
-        title: "Advertencia",
-        description: "El precio de venta debería ser mayor al precio de compra.",
+        title: "Éxito",
+        description: product ? "Producto actualizado correctamente." : "Producto creado correctamente.",
+      });
+
+      onClose();
+    } catch (error) {
+      console.error("Error guardando producto:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el producto.",
         variant: "destructive",
       });
-      return;
     }
-
-    // Simular guardado
-    console.log("Guardando producto:", formData);
-    
-    toast({
-      title: "Éxito",
-      description: product ? "Producto actualizado correctamente." : "Producto creado correctamente.",
-    });
-
-    onClose();
   };
 
   const handleInputChange = (field: string, value: any) => {
@@ -135,13 +159,13 @@ export const ProductForm = ({ product, onClose }: ProductFormProps) => {
 
         <div className="space-y-2">
           <Label htmlFor="category">Categoría *</Label>
-          <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
+          <Select value={formData.category_id} onValueChange={(value) => handleInputChange("category_id", value)}>
             <SelectTrigger>
               <SelectValue placeholder="Selecciona una categoría" />
             </SelectTrigger>
             <SelectContent>
               {categories.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -162,63 +186,50 @@ export const ProductForm = ({ product, onClose }: ProductFormProps) => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="purchasePrice">Precio de Compra</Label>
+          <Label htmlFor="unit_price">Precio Unitario</Label>
           <Input
-            id="purchasePrice"
+            id="unit_price"
             type="number"
             step="0.01"
             min="0"
-            value={formData.purchasePrice}
-            onChange={(e) => handleInputChange("purchasePrice", parseFloat(e.target.value) || 0)}
+            value={formData.unit_price}
+            onChange={(e) => handleInputChange("unit_price", parseFloat(e.target.value) || 0)}
             placeholder="0.00"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="sellingPrice">Precio de Venta</Label>
+          <Label htmlFor="current_stock">Stock Actual</Label>
           <Input
-            id="sellingPrice"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.sellingPrice}
-            onChange={(e) => handleInputChange("sellingPrice", parseFloat(e.target.value) || 0)}
-            placeholder="0.00"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="currentStock">Stock Actual</Label>
-          <Input
-            id="currentStock"
+            id="current_stock"
             type="number"
             min="0"
-            value={formData.currentStock}
-            onChange={(e) => handleInputChange("currentStock", parseInt(e.target.value) || 0)}
+            value={formData.current_stock}
+            onChange={(e) => handleInputChange("current_stock", parseInt(e.target.value) || 0)}
             placeholder="0"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="minStock">Stock Mínimo</Label>
+          <Label htmlFor="min_stock">Stock Mínimo</Label>
           <Input
-            id="minStock"
+            id="min_stock"
             type="number"
             min="0"
-            value={formData.minStock}
-            onChange={(e) => handleInputChange("minStock", parseInt(e.target.value) || 0)}
+            value={formData.min_stock}
+            onChange={(e) => handleInputChange("min_stock", parseInt(e.target.value) || 0)}
             placeholder="0"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="maxStock">Stock Máximo</Label>
+          <Label htmlFor="max_stock">Stock Máximo</Label>
           <Input
-            id="maxStock"
+            id="max_stock"
             type="number"
             min="0"
-            value={formData.maxStock}
-            onChange={(e) => handleInputChange("maxStock", parseInt(e.target.value) || 0)}
+            value={formData.max_stock}
+            onChange={(e) => handleInputChange("max_stock", parseInt(e.target.value) || 0)}
             placeholder="0"
           />
         </div>
@@ -247,11 +258,11 @@ export const ProductForm = ({ product, onClose }: ProductFormProps) => {
 
       <div className="flex items-center space-x-2">
         <Switch
-          id="isActive"
-          checked={formData.isActive}
-          onCheckedChange={(checked) => handleInputChange("isActive", checked)}
+          id="status"
+          checked={formData.status === "active"}
+          onCheckedChange={(checked) => handleInputChange("status", checked ? "active" : "inactive")}
         />
-        <Label htmlFor="isActive">Producto Activo</Label>
+        <Label htmlFor="status">Producto Activo</Label>
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
