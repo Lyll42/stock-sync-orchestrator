@@ -95,18 +95,18 @@ const Movements = () => {
   };
 
   const movementTypes = [
-    { value: "entrada", label: "Entrada", icon: ArrowUp, color: "text-green-600" },
-    { value: "salida", label: "Salida", icon: ArrowDown, color: "text-red-600" },
-    { value: "ajuste", label: "Ajuste", icon: RefreshCw, color: "text-blue-600" }
+    { value: "entry", label: "Entrada", icon: ArrowUp, color: "text-green-600" },
+    { value: "exit", label: "Salida", icon: ArrowDown, color: "text-red-600" },
+    { value: "adjustment", label: "Ajuste", icon: RefreshCw, color: "text-blue-600" }
   ];
 
   const calculateNewStock = (currentStock: number, quantity: number, type: string): number => {
     switch (type) {
-      case "entrada":
+      case "entry":
         return currentStock + Math.abs(quantity);
-      case "salida":
+      case "exit":
         return currentStock - Math.abs(quantity);
-      case "ajuste":
+      case "adjustment":
         return currentStock + quantity; // Permite números negativos para ajustes
       default:
         return currentStock;
@@ -139,11 +139,11 @@ const Movements = () => {
 
     try {
       // Calcular el nuevo stock basado en el tipo de movimiento
-      const adjustedQuantity = formData.type === "salida" ? Math.abs(formData.quantity) : formData.quantity;
+      const adjustedQuantity = formData.type === "exit" ? Math.abs(formData.quantity) : formData.quantity;
       const newStock = calculateNewStock(selectedProduct.current_stock, adjustedQuantity, formData.type);
 
       // Validar que no haya stock negativo para salidas
-      if (newStock < 0 && formData.type === "salida") {
+      if (newStock < 0 && formData.type === "exit") {
         toast({
           title: "Error",
           description: `Stock insuficiente. Stock actual: ${selectedProduct.current_stock}, cantidad solicitada: ${Math.abs(formData.quantity)}`,
@@ -156,13 +156,13 @@ const Movements = () => {
       // Determinar la cantidad real del movimiento (con signo correcto)
       let movementQuantity: number;
       switch (formData.type) {
-        case "entrada":
+        case "entry":
           movementQuantity = Math.abs(formData.quantity);
           break;
-        case "salida":
+        case "exit":
           movementQuantity = -Math.abs(formData.quantity);
           break;
-        case "ajuste":
+        case "adjustment":
           movementQuantity = formData.quantity;
           break;
         default:
@@ -198,7 +198,7 @@ const Movements = () => {
       addEvent({
         type: 'movement_registered',
         title: 'Movimiento Registrado',
-        message: `${formData.type === "entrada" ? "Entrada" : formData.type === "salida" ? "Salida" : "Ajuste"} de ${Math.abs(movementQuantity)} unidades de ${selectedProduct.name}`,
+        message: `${formData.type === "entry" ? "Entrada" : formData.type === "exit" ? "Salida" : "Ajuste"} de ${Math.abs(movementQuantity)} unidades de ${selectedProduct.name}`,
         severity: 'success',
         source: 'inventory',
         data: {
@@ -212,7 +212,7 @@ const Movements = () => {
       });
 
       // Verificar si el stock está bajo después del movimiento
-      if (newStock <= selectedProduct.min_stock && formData.type === "salida") {
+      if (newStock <= selectedProduct.min_stock && formData.type === "exit") {
         addEvent({
           type: 'stock_alert',
           title: 'Alerta de Stock Bajo',
@@ -496,17 +496,17 @@ const Movements = () => {
                   placeholder="Ingresa la cantidad"
                 />
                 <div className="text-xs space-y-1">
-                  {formData.type === "salida" && (
+                  {formData.type === "exit" && (
                     <p className="text-red-600">
                       Se restará {Math.abs(formData.quantity)} del stock actual
                     </p>
                   )}
-                  {formData.type === "entrada" && (
+                  {formData.type === "entry" && (
                     <p className="text-green-600">
                       Se agregará {Math.abs(formData.quantity)} al stock actual
                     </p>
                   )}
-                  {formData.type === "ajuste" && (
+                  {formData.type === "adjustment" && (
                     <p className="text-blue-600">
                       Ajuste: {formData.quantity > 0 ? "+" : ""}{formData.quantity} unidades
                     </p>
