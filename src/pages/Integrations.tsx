@@ -26,14 +26,14 @@ import { useEvents } from "@/contexts/EventContext";
 import { toast } from "@/hooks/use-toast";
 
 const Integrations = () => {
-  const { subscribeToN8N, unsubscribeFromN8N, isConnected, connectionStatus } = useEvents();
+  const { subscribeToWebhook, unsubscribeFromWebhook, isConnected, connectionStatus } = useEvents();
   const [webhookUrl, setWebhookUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [webhooks, setWebhooks] = useState([
     {
       id: "1",
       name: "Stock Alerts",
-      url: "https://n8n.company.com/webhook/stock-alert",
+      url: "https://api.company.com/webhook/stock-alert",
       status: "active",
       lastTriggered: "2024-01-15 14:30:00",
       events: 145
@@ -41,7 +41,7 @@ const Integrations = () => {
     {
       id: "2", 
       name: "Order Sync",
-      url: "https://n8n.company.com/webhook/order-sync",
+      url: "https://api.company.com/webhook/order-sync",
       status: "active",
       lastTriggered: "2024-01-15 15:45:00",
       events: 89
@@ -49,7 +49,7 @@ const Integrations = () => {
     {
       id: "3",
       name: "Product Updates",
-      url: "https://n8n.company.com/webhook/product-update",
+      url: "https://api.company.com/webhook/product-update",
       status: "inactive",
       lastTriggered: "2024-01-14 09:15:00",
       events: 12
@@ -70,15 +70,15 @@ const Integrations = () => {
     try {
       // Simulate connection delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      subscribeToN8N(webhookUrl);
+      subscribeToWebhook(webhookUrl);
       toast({
         title: "¡Conectado!",
-        description: "Conexión con N8N establecida exitosamente",
+        description: "Conexión con webhook establecida exitosamente",
       });
     } catch (error) {
       toast({
         title: "Error de conexión",
-        description: "No se pudo conectar con N8N. Verifica la URL.",
+        description: "No se pudo conectar con el webhook. Verifica la URL.",
         variant: "destructive",
       });
     } finally {
@@ -87,10 +87,10 @@ const Integrations = () => {
   };
 
   const handleDisconnect = () => {
-    unsubscribeFromN8N();
+    unsubscribeFromWebhook();
     toast({
       title: "Desconectado",
-      description: "Conexión con N8N terminada",
+      description: "Conexión con webhook terminada",
     });
   };
 
@@ -129,7 +129,7 @@ const Integrations = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Integraciones N8N</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Integraciones Webhook</h1>
         <p className="text-muted-foreground mt-2">
           Configura y gestiona las conexiones con flujos de trabajo automatizados
         </p>
@@ -148,16 +148,16 @@ const Integrations = () => {
             </Badge>
           </CardTitle>
           <CardDescription>
-            Conexión en tiempo real con N8N para eventos automáticos
+            Conexión en tiempo real con webhooks para eventos automáticos
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <Label htmlFor="webhook-url">URL del Webhook N8N</Label>
+              <Label htmlFor="webhook-url">URL del Webhook</Label>
               <Input
                 id="webhook-url"
-                placeholder="https://n8n.your-domain.com/webhook/your-webhook"
+                placeholder="https://your-domain.com/webhook/endpoint"
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 disabled={isConnected}
@@ -195,7 +195,7 @@ const Integrations = () => {
             <Alert>
               <Bell className="h-4 w-4" />
               <AlertDescription>
-                Conexión activa: Recibiendo eventos en tiempo real desde N8N
+                Conexión activa: Recibiendo eventos en tiempo real desde webhook
               </AlertDescription>
             </Alert>
           )}
@@ -217,7 +217,7 @@ const Integrations = () => {
                 Webhooks Configurados
               </CardTitle>
               <CardDescription>
-                Gestiona los endpoints para recibir datos desde N8N
+                Gestiona los endpoints para recibir datos desde webhooks externos
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -291,7 +291,7 @@ const Integrations = () => {
                 <div>
                   <Label>Notificaciones en Tiempo Real</Label>
                   <p className="text-sm text-muted-foreground">
-                    Mostrar notificaciones de eventos N8N
+                    Mostrar notificaciones de eventos webhook
                   </p>
                 </div>
                 <Switch defaultChecked />

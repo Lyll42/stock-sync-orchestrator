@@ -29,8 +29,7 @@ import {
   ArrowDownRight,
   Activity,
   Users,
-  ShoppingCart,
-  Zap
+  ShoppingCart
 } from "lucide-react";
 import RealTimeNotifications from "@/components/notifications/RealTimeNotifications";
 import { useEvents } from "@/contexts/EventContext";
@@ -153,7 +152,9 @@ const Dashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-center">
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalProducts.toLocaleString()}</div>
@@ -167,7 +168,9 @@ const Dashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <div className="flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{metrics.lowStockProducts}</div>
@@ -181,7 +184,9 @@ const Dashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -197,7 +202,9 @@ const Dashboard = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Movimientos Hoy</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.todayMovements}</div>
@@ -209,43 +216,56 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* N8N Integration Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-blue-500" />
-            Estado de Integraciones N8N
-          </CardTitle>
-          <CardDescription>
-            Conexiones activas y métricas de sincronización
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <p className="text-sm font-medium">Webhooks Activos</p>
-                <p className="text-2xl font-bold">{metrics.n8nConnections}</p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+      {/* Additional Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Categorías Activas</CardTitle>
+            <div className="flex items-center justify-center">
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <p className="text-sm font-medium">Eventos Procesados</p>
-                <p className="text-2xl font-bold">147</p>
-              </div>
-              <Badge variant="secondary">Última hora</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.totalCategories}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              <ArrowUpRight className="h-3 w-3 text-blue-500 mr-1" />
+              Todas activas
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <p className="text-sm font-medium">Tiempo de Respuesta</p>
-                <p className="text-2xl font-bold">~120ms</p>
-              </div>
-              <Badge variant="outline" className="text-green-600">Óptimo</Badge>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Proveedores</CardTitle>
+            <div className="flex items-center justify-center">
+              <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.activeSuppliers}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+              Activos
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Órdenes Pendientes</CardTitle>
+            <div className="flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{metrics.pendingOrders}</div>
+            <div className="flex items-center text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse" />
+              Requieren revisión
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
@@ -254,6 +274,8 @@ const Dashboard = () => {
           <TabsTrigger value="trends">Tendencias</TabsTrigger>
           <TabsTrigger value="categories">Por Categorías</TabsTrigger>
           <TabsTrigger value="movements">Movimientos</TabsTrigger>
+          <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
+          <TabsTrigger value="predictions">Predicciones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -361,6 +383,91 @@ const Dashboard = () => {
                   <Area type="monotone" dataKey="entrada" stroke="#82ca9d" fillOpacity={1} fill="url(#colorEntrada)" />
                   <Area type="monotone" dataKey="salida" stroke="#8884d8" fillOpacity={1} fill="url(#colorSalida)" />
                 </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="suppliers" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Análisis de Proveedores</CardTitle>
+              <CardDescription>
+                Distribución de productos y valor por proveedor
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Proveedor A', value: 35, productos: 145 },
+                      { name: 'Proveedor B', value: 25, productos: 89 },
+                      { name: 'Proveedor C', value: 20, productos: 67 },
+                      { name: 'Proveedor D', value: 15, productos: 45 },
+                      { name: 'Otros', value: 5, productos: 23 }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {chartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value, name, props) => [`${props.payload.productos} productos`, name]} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="predictions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Predicción de Stock</CardTitle>
+              <CardDescription>
+                Proyección basada en tendencias de consumo actuales
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart 
+                  data={[
+                    { mes: 'Jul', actual: 2300, prediccion: null },
+                    { mes: 'Ago', actual: 2800, prediccion: null },
+                    { mes: 'Sep', actual: 2100, prediccion: null },
+                    { mes: 'Oct', actual: 2600, prediccion: null },
+                    { mes: 'Nov', actual: null, prediccion: 2400 },
+                    { mes: 'Dic', actual: null, prediccion: 2700 },
+                    { mes: 'Ene', actual: null, prediccion: 2200 },
+                    { mes: 'Feb', actual: null, prediccion: 2500 }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line 
+                    type="monotone" 
+                    dataKey="actual" 
+                    stroke="#8884d8" 
+                    strokeWidth={3}
+                    name="Stock Actual"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="prediccion" 
+                    stroke="#82ca9d" 
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Predicción"
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>

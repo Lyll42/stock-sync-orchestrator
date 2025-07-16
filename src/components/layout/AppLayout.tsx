@@ -68,7 +68,7 @@ const AppLayout = () => {
       name: "Integraciones",
       href: "/integrations",
       icon: Zap,
-      description: "N8N y APIs"
+      description: "Webhooks y APIs"
     },
     ...(isAdmin ? [{
       name: "Usuarios",

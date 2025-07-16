@@ -1,10 +1,9 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 interface EventData {
   id: string;
-  type: 'stock_alert' | 'n8n_sync' | 'movement_registered' | 'integration_status' | 'webhook_received';
+  type: 'stock_alert' | 'webhook_sync' | 'movement_registered' | 'integration_status' | 'webhook_received';
   title: string;
   message: string;
   data?: any;
@@ -19,8 +18,8 @@ interface EventContextType {
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   addEvent: (event: Omit<EventData, 'id' | 'timestamp'>) => void;
   clearEvents: () => void;
-  subscribeToN8N: (webhookUrl: string) => void;
-  unsubscribeFromN8N: () => void;
+  subscribeToWebhook: (webhookUrl: string) => void;
+  unsubscribeFromWebhook: () => void;
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
@@ -64,13 +63,12 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     setEvents([]);
   };
 
-  const subscribeToN8N = (webhookUrl: string) => {
+  const subscribeToWebhook = (webhookUrl: string) => {
     if (ws) {
       ws.close();
     }
 
-    // Simulate WebSocket connection to N8N
-    // In a real implementation, this would connect to your WebSocket server
+    // Simulate WebSocket connection
     const mockConnection = () => {
       setConnectionStatus('connecting');
       
@@ -80,31 +78,31 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
         
         addEvent({
           type: 'integration_status',
-          title: 'N8N Conectado',
-          message: 'Conexión establecida con N8N webhook',
+          title: 'Webhook Conectado',
+          message: 'Conexión establecida con webhook externo',
           severity: 'success',
-          source: 'n8n',
+          source: 'webhook',
         });
 
-        // Simulate periodic events from N8N
+        // Simulate periodic events from webhook
         const interval = setInterval(() => {
           const eventTypes = [
             {
-              type: 'n8n_sync' as const,
-              title: 'Sincronización N8N',
+              type: 'webhook_sync' as const,
+              title: 'Sincronización Webhook',
               message: 'Productos sincronizados desde e-commerce',
               severity: 'info' as const,
             },
             {
               type: 'stock_alert' as const,
               title: 'Alerta de Stock',
-              message: 'Producto con stock bajo detectado por N8N',
+              message: 'Producto con stock bajo detectado',
               severity: 'warning' as const,
             },
             {
               type: 'webhook_received' as const,
               title: 'Webhook Recibido',
-              message: 'Nueva orden procesada desde Shopify',
+              message: 'Nueva orden procesada exitosamente',
               severity: 'success' as const,
             },
           ];
@@ -112,7 +110,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
           const randomEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
           addEvent({
             ...randomEvent,
-            source: 'n8n',
+            source: 'webhook',
             data: {
               webhookUrl,
               products: Math.floor(Math.random() * 10) + 1,
@@ -121,22 +119,22 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
         }, 15000); // Event every 15 seconds
 
         // Store interval for cleanup
-        (window as any).n8nInterval = interval;
+        (window as any).webhookInterval = interval;
       }, 2000);
     };
 
     mockConnection();
   };
 
-  const unsubscribeFromN8N = () => {
+  const unsubscribeFromWebhook = () => {
     if (ws) {
       ws.close();
       setWs(null);
     }
     
-    if ((window as any).n8nInterval) {
-      clearInterval((window as any).n8nInterval);
-      (window as any).n8nInterval = null;
+    if ((window as any).webhookInterval) {
+      clearInterval((window as any).webhookInterval);
+      (window as any).webhookInterval = null;
     }
 
     setIsConnected(false);
@@ -144,8 +142,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     
     addEvent({
       type: 'integration_status',
-      title: 'N8N Desconectado',
-      message: 'Conexión con N8N terminada',
+      title: 'Webhook Desconectado',
+      message: 'Conexión con webhook terminada',
       severity: 'info',
       source: 'system',
     });
@@ -156,8 +154,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       if (ws) {
         ws.close();
       }
-      if ((window as any).n8nInterval) {
-        clearInterval((window as any).n8nInterval);
+      if ((window as any).webhookInterval) {
+        clearInterval((window as any).webhookInterval);
       }
     };
   }, [ws]);
@@ -170,8 +168,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
         connectionStatus,
         addEvent,
         clearEvents,
-        subscribeToN8N,
-        unsubscribeFromN8N,
+        subscribeToWebhook,
+        unsubscribeFromWebhook,
       }}
     >
       {children}
