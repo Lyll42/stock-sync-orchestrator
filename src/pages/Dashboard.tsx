@@ -33,22 +33,9 @@ import {
 } from "lucide-react";
 import RealTimeNotifications from "@/components/notifications/RealTimeNotifications";
 import { useEvents } from "@/contexts/EventContext";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data for charts
-const mockData = [
-  { name: 'Ene', ingresos: 2400, egresos: 1398, stock: 9800 },
-  { name: 'Feb', ingresos: 1398, egresos: 2210, stock: 3908 },
-  { name: 'Mar', ingresos: 9800, egresos: 2210, stock: 4800 },
-  { name: 'Abr', ingresos: 3908, egresos: 2000, stock: 3800 },
-  { name: 'May', ingresos: 4800, egresos: 1398, stock: 4300 },
-  { name: 'Jun', ingresos: 3800, egresos: 2210, stock: 2300 },
-  { name: 'Jul', ingresos: 4300, egresos: 2000, stock: 4300 },
-  { name: 'Ago', ingresos: 2300, egresos: 1398, stock: 6700 },
-  { name: 'Sep', ingresos: 6700, egresos: 2210, stock: 2300 },
-  { name: 'Oct', ingresos: 2300, egresos: 2000, stock: 7800 },
-  { name: 'Nov', ingresos: 7800, egresos: 1398, stock: 5600 },
-  { name: 'Dic', ingresos: 5600, egresos: 2210, stock: 2300 },
-];
+// Data will be loaded from database
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -67,70 +54,194 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 
 const Dashboard = () => {
   const { addEvent } = useEvents();
+  const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState({
-    totalProducts: 1245,
-    lowStockProducts: 23,
-    totalValue: 125450.75,
-    todayMovements: 45,
-    totalCategories: 15,
-    activeSuppliers: 8,
-    pendingOrders: 12,
-    n8nConnections: 3
+    totalProducts: 0,
+    lowStockProducts: 0,
+    totalValue: 0,
+    todayMovements: 0,
+    totalCategories: 0,
+    activeSuppliers: 0,
+    pendingOrders: 0
   });
 
-  const chartData = [
-    { name: 'Electrónicos', value: 400 },
-    { name: 'Ropa', value: 300 },
-    { name: 'Alimentos', value: 300 },
-    { name: 'Hogar', value: 200 },
-  ];
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [movementData, setMovementData] = useState<any[]>([]);
+  const [movementTrendsData, setMovementTrendsData] = useState<any[]>([]);
+  const [supplierData, setSupplierData] = useState<any[]>([]);
+  const [stockPredictionData, setStockPredictionData] = useState<any[]>([]);
 
-  const movementData = [
-    { time: '08:00', entrada: 120, salida: 50 },
-    { time: '10:00', entrada: 80, salida: 30 },
-    { time: '12:00', entrada: 150, salida: 70 },
-    { time: '14:00', entrada: 90, salida: 40 },
-    { time: '16:00', entrada: 110, salida: 60 },
-    { time: '18:00', entrada: 70, salida: 20 },
-  ];
+  // Load dashboard data from database
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
 
-  // Simulate real-time updates
+      // Load basic metrics
+      const [
+        { data: products },
+        { data: categories },
+        { data: movements },
+        { data: todayMovements }
+      ] = await Promise.all([
+        supabase.from('products').select('id, current_stock, min_stock, unit_price, supplier'),
+        supabase.from('categories').select('id, name'),
+        supabase.from('movements').select('*').order('created_at', { ascending: false }),
+        supabase.from('movements').select('*').gte('created_at', new Date().toISOString().split('T')[0])
+      ]);
+
+      if (products) {
+        const lowStock = products.filter(p => p.current_stock <= p.min_stock).length;
+        const totalValue = products.reduce((sum, p) => sum + (p.current_stock * (p.unit_price || 0)), 0);
+        const suppliers = new Set(products.map(p => p.supplier).filter(s => s)).size;
+
+        setMetrics({
+          totalProducts: products.length,
+          lowStockProducts: lowStock,
+          totalValue,
+          todayMovements: todayMovements?.length || 0,
+          totalCategories: categories?.length || 0,
+          activeSuppliers: suppliers,
+          pendingOrders: lowStock // Using low stock as pending orders proxy
+        });
+
+        // Categories chart data
+        const categoryStats = await supabase
+          .from('products')
+          .select('category_id, categories(name)')
+          .not('category_id', 'is', null);
+
+        if (categoryStats.data) {
+          const categoryCount = categoryStats.data.reduce((acc: any, item: any) => {
+            const categoryName = item.categories?.name || 'Sin categoría';
+            acc[categoryName] = (acc[categoryName] || 0) + 1;
+            return acc;
+          }, {});
+
+          setChartData(Object.entries(categoryCount).map(([name, value]) => ({ name, value })));
+        }
+
+        // Supplier data
+        const supplierStats = products.reduce((acc: any, product: any) => {
+          const supplier = product.supplier || 'Sin proveedor';
+          if (!acc[supplier]) {
+            acc[supplier] = { count: 0, value: 0 };
+          }
+          acc[supplier].count += 1;
+          acc[supplier].value += product.current_stock * (product.unit_price || 0);
+          return acc;
+        }, {});
+
+        setSupplierData(
+          Object.entries(supplierStats)
+            .map(([name, stats]: [string, any]) => ({
+              name,
+              value: stats.value,
+              productos: stats.count
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5)
+        );
+      }
+
+      // Movement trends by hour
+      if (movements) {
+        const hourlyMovements = movements.reduce((acc: any, movement: any) => {
+          const hour = new Date(movement.created_at).getHours();
+          const hourKey = `${hour.toString().padStart(2, '0')}:00`;
+          
+          if (!acc[hourKey]) {
+            acc[hourKey] = { time: hourKey, entrada: 0, salida: 0 };
+          }
+          
+          if (movement.movement_type === 'entry') {
+            acc[hourKey].entrada += movement.quantity;
+          } else if (movement.movement_type === 'exit') {
+            acc[hourKey].salida += movement.quantity;
+          }
+          
+          return acc;
+        }, {});
+
+        setMovementData(Object.values(hourlyMovements).slice(0, 12));
+
+        // Monthly movement trends
+        const monthlyData = movements.reduce((acc: any, movement: any) => {
+          const month = new Date(movement.created_at).toLocaleString('es-ES', { month: 'short' });
+          
+          if (!acc[month]) {
+            acc[month] = { name: month, ingresos: 0, egresos: 0, stock: 0 };
+          }
+          
+          if (movement.movement_type === 'entry') {
+            acc[month].ingresos += movement.quantity;
+          } else if (movement.movement_type === 'exit') {
+            acc[month].egresos += movement.quantity;
+          }
+          acc[month].stock = movement.new_stock;
+          
+          return acc;
+        }, {});
+
+        setMovementTrendsData(Object.values(monthlyData).slice(0, 12));
+
+        // Stock prediction (simple projection based on recent trends)
+        const recentMovements = movements.slice(0, 30);
+        const avgDaily = recentMovements.length > 0 
+          ? recentMovements.reduce((sum: number, m: any) => sum + (m.movement_type === 'exit' ? -m.quantity : m.quantity), 0) / 30
+          : 0;
+
+        const currentStock = products?.reduce((sum, p) => sum + p.current_stock, 0) || 0;
+        const predictions = [];
+        
+        for (let i = 1; i <= 4; i++) {
+          const futureMonth = new Date();
+          futureMonth.setMonth(futureMonth.getMonth() + i);
+          const projectedStock = Math.max(0, currentStock + (avgDaily * 30 * i));
+          
+          predictions.push({
+            mes: futureMonth.toLocaleString('es-ES', { month: 'short' }),
+            actual: null,
+            prediccion: Math.round(projectedStock)
+          });
+        }
+
+        setStockPredictionData([
+          { mes: 'Actual', actual: currentStock, prediccion: null },
+          ...predictions
+        ]);
+      }
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  // Real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
-      // Simulate random metric updates
-      setMetrics(prev => ({
-        ...prev,
-        todayMovements: prev.todayMovements + Math.floor(Math.random() * 3),
-        totalValue: prev.totalValue + (Math.random() - 0.5) * 1000,
-      }));
-
-      // Simulate occasional events
-      if (Math.random() < 0.3) {
-        const eventTypes = [
-          {
-            type: 'movement_registered' as const,
-            title: 'Nuevo Movimiento',
-            message: 'Entrada de 25 unidades registrada',
-            severity: 'success' as const,
-          },
-          {
-            type: 'stock_alert' as const,
-            title: 'Stock Bajo',
-            message: 'Producto ABC123 requiere reposición',
-            severity: 'warning' as const,
-          },
-        ];
-        
-        const randomEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-        addEvent({
-          ...randomEvent,
-          source: 'system',
-        });
-      }
-    }, 10000);
+      loadDashboardData(); // Refresh data every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [addEvent]);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -288,13 +399,13 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={mockData}>
+                <BarChart data={movementTrendsData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="ingresos" fill="#82ca9d" />
-                  <Bar dataKey="egresos" fill="#e48080" />
+                  <Bar dataKey="ingresos" fill="#82ca9d" name="Entradas" />
+                  <Bar dataKey="egresos" fill="#e48080" name="Salidas" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -311,12 +422,12 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={mockData}>
+                <LineChart data={movementTrendsData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="stock" stroke="#8884d8" activeDot={{ r: 8 }} />
+                  <Line type="monotone" dataKey="stock" stroke="#8884d8" activeDot={{ r: 8 }} name="Stock Total" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
@@ -400,13 +511,7 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={[
-                      { name: 'Proveedor A', value: 35, productos: 145 },
-                      { name: 'Proveedor B', value: 25, productos: 89 },
-                      { name: 'Proveedor C', value: 20, productos: 67 },
-                      { name: 'Proveedor D', value: 15, productos: 45 },
-                      { name: 'Otros', value: 5, productos: 23 }
-                    ]}
+                    data={supplierData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -415,7 +520,7 @@ const Dashboard = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {chartData.map((_, index) => (
+                    {supplierData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -436,18 +541,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart 
-                  data={[
-                    { mes: 'Jul', actual: 2300, prediccion: null },
-                    { mes: 'Ago', actual: 2800, prediccion: null },
-                    { mes: 'Sep', actual: 2100, prediccion: null },
-                    { mes: 'Oct', actual: 2600, prediccion: null },
-                    { mes: 'Nov', actual: null, prediccion: 2400 },
-                    { mes: 'Dic', actual: null, prediccion: 2700 },
-                    { mes: 'Ene', actual: null, prediccion: 2200 },
-                    { mes: 'Feb', actual: null, prediccion: 2500 }
-                  ]}
-                >
+                <LineChart data={stockPredictionData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="mes" />
                   <YAxis />
@@ -456,8 +550,9 @@ const Dashboard = () => {
                     type="monotone" 
                     dataKey="actual" 
                     stroke="#8884d8" 
-                    strokeWidth={3}
+                    strokeWidth={2}
                     name="Stock Actual"
+                    connectNulls={false}
                   />
                   <Line 
                     type="monotone" 
@@ -466,6 +561,7 @@ const Dashboard = () => {
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     name="Predicción"
+                    connectNulls={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
