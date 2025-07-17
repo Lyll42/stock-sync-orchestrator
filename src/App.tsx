@@ -8,7 +8,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Products from "@/pages/Products";
 import Movements from "@/pages/Movements";
-import Integrations from "@/pages/Integrations";
+import Suppliers from "@/pages/Suppliers";
 import Auth from "@/pages/Auth";
 import UserManagement from "@/pages/UserManagement";
 import { EventProvider } from "@/contexts/EventContext";
@@ -30,7 +30,7 @@ const App = () => (
                 <Route index element={<Dashboard />} />
                 <Route path="products" element={<Products />} />
                 <Route path="movements" element={<Movements />} />
-                <Route path="integrations" element={<Integrations />} />
+                <Route path="suppliers" element={<Suppliers />} />
                 <Route path="users" element={<UserManagement />} />
               </Route>
             </Routes>

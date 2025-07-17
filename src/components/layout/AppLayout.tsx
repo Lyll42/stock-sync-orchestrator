@@ -11,7 +11,7 @@ import {
   BarChart3, 
   Package, 
   ArrowRightLeft, 
-  Zap, 
+  Truck, 
   Menu, 
   Bell, 
   Settings, 
@@ -65,10 +65,10 @@ const AppLayout = () => {
       description: "Entradas y salidas"
     },
     {
-      name: "Integraciones",
-      href: "/integrations",
-      icon: Zap,
-      description: "Webhooks y APIs"
+      name: "Proveedores",
+      href: "/suppliers",
+      icon: Truck,
+      description: "Gestión de proveedores"
     },
     ...(isAdmin ? [{
       name: "Usuarios",

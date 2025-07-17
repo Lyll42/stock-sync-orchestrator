@@ -102,6 +102,7 @@ export type Database = {
           sku: string
           status: string | null
           supplier: string | null
+          supplier_id: string | null
           unit_price: number | null
           updated_at: string
         }
@@ -118,6 +119,7 @@ export type Database = {
           sku: string
           status?: string | null
           supplier?: string | null
+          supplier_id?: string | null
           unit_price?: number | null
           updated_at?: string
         }
@@ -134,6 +136,7 @@ export type Database = {
           sku?: string
           status?: string | null
           supplier?: string | null
+          supplier_id?: string | null
           unit_price?: number | null
           updated_at?: string
         }
@@ -143,6 +146,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -174,6 +184,57 @@ export type Database = {
           role?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          city: string | null
+          contact_person: string | null
+          country: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          status: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          status?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contact_person?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          status?: string | null
+          updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
