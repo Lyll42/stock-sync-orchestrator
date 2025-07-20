@@ -12,6 +12,7 @@ import {
   Package, 
   ArrowRightLeft, 
   Truck, 
+  ShoppingCart,
   Menu, 
   Bell, 
   Settings, 
@@ -68,6 +69,12 @@ const AppLayout = () => {
       href: "/suppliers",
       icon: Truck,
       description: "Gestión de proveedores"
+    },
+    {
+      name: "Órdenes",
+      href: "/orders",
+      icon: ShoppingCart,
+      description: "Gestión de órdenes"
     },
     {
       name: "Configuración",
