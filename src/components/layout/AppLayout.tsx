@@ -17,7 +17,6 @@ import {
   Settings, 
   User,
   ChevronDown,
-  Users,
   LogOut
 } from "lucide-react";
 
@@ -70,12 +69,12 @@ const AppLayout = () => {
       icon: Truck,
       description: "Gestión de proveedores"
     },
-    ...(isAdmin ? [{
-      name: "Usuarios",
-      href: "/users",
-      icon: Users,
-      description: "Gestión de usuarios"
-    }] : [])
+    {
+      name: "Configuración",
+      href: "/settings",
+      icon: Settings,
+      description: "Configuración del sistema"
+    }
   ];
 
   const isActive = (path: string) => {
@@ -146,7 +145,7 @@ const AppLayout = () => {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
               <Settings className="mr-2 h-4 w-4" />
               Configuración
             </DropdownMenuItem>
@@ -222,7 +221,7 @@ const AppLayout = () => {
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
                   <Settings className="mr-2 h-4 w-4" />
                   Configuración
                 </DropdownMenuItem>

@@ -9,8 +9,9 @@ import Dashboard from "@/pages/Dashboard";
 import Products from "@/pages/Products";
 import Movements from "@/pages/Movements";
 import Suppliers from "@/pages/Suppliers";
+import Settings from "@/pages/Settings";
+import NotFound from "@/pages/NotFound";
 import Auth from "@/pages/Auth";
-import UserManagement from "@/pages/UserManagement";
 import { EventProvider } from "@/contexts/EventContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -31,7 +32,8 @@ const App = () => (
                 <Route path="products" element={<Products />} />
                 <Route path="movements" element={<Movements />} />
                 <Route path="suppliers" element={<Suppliers />} />
-                <Route path="users" element={<UserManagement />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </BrowserRouter>
